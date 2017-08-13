@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+
 public class Triangle {
     public readonly List<Vector3> Points;
 
@@ -54,13 +55,13 @@ public class Faces
 public class Grid
 {
     private Vector3[,] _Grid;
-    public readonly int GridSplitCount;
+    public readonly int GridResolution;
     public readonly int PointCount; 
 
-    public Grid(int gridSplitCount, float size)
+    public Grid(int gridResolution, float size)
     {
-        GridSplitCount = gridSplitCount;
-        PointCount = (int)(Mathf.Pow(2,gridSplitCount) + 1.0f);
+        GridResolution = gridResolution;
+        PointCount = (int)(Mathf.Pow(2,gridResolution) + 1.0f);
         float translateX = PointCount * size * 0.5f;
         float translateZ = PointCount * size * 0.5f;
         _Grid = new Vector3[PointCount, PointCount];
@@ -136,32 +137,34 @@ public class Grid
 public class FractalGrid {
 
     public Grid Grid;
-    private float RandomSize = 1;
+    private float RandomHeightSize = 1;
     private float RandomDecay;
+    private float RandomSeed;
     private System.Random Random = new System.Random();
 
-    public FractalGrid(int gridSplitCount, float size, float randomSize, float seed, float randomDecay)
+    public FractalGrid(int gridResolution, float size, float randomHeightSize, float randomSeed, float randomDecay)
     {
-        Grid = new Grid(gridSplitCount, size);
-        RandomSize = randomSize;
+        Grid = new Grid(gridResolution, size);
+        RandomHeightSize = randomHeightSize;
         RandomDecay = randomDecay;
+        RandomSeed = randomSeed;
         InitialiseCorners();
+        Diamond(1, RandomHeightSize);
     }
 
     private void InitialiseCorners()
     {
-        float cornerHeight = (float)(Random.NextDouble() * RandomSize);
+        float cornerHeight = RandomHeightSize; //NextRandom(RandomHeightSize);
         int lastPoint = Grid.PointCount-1;
         Grid.SetHeight(0, 0, cornerHeight);
         Grid.SetHeight(lastPoint, 0, cornerHeight);
         Grid.SetHeight(0, lastPoint, cornerHeight);
         Grid.SetHeight(lastPoint, lastPoint, cornerHeight);
-        Diamond(1, RandomSize);
     }
 
-    private void Diamond(int gridSplitDepth, float randomSize)
+    private void Diamond(int gridSplitDepth, float randomHeightSize)
     {
-        if (gridSplitDepth > Grid.GridSplitCount)
+        if (gridSplitDepth > Grid.GridResolution)
         {
             return;
         }
@@ -179,36 +182,39 @@ public class FractalGrid {
                 float height_ne = Grid.GetHeight(i, j + spacing);
                 float height_se = Grid.GetHeight(i + spacing, j + spacing);
                 float height_sw = Grid.GetHeight(i + spacing, j);
-                float height = ((height_nw + height_ne + height_se + height_sw) / 4) + (float)(Random.NextDouble() * randomSize);
+                float height = ((height_nw + height_ne + height_se + height_sw) / 4) + NextRandom(randomHeightSize);
                 Grid.SetHeight(i_diamond, j_diamond, height);
             }
         }
-        Square(gridSplitDepth, randomSize);
+        Square(gridSplitDepth, randomHeightSize);
     }
 
-    private void Square(int gridSplitDepth, float randomSize)
+    private void Square(int gridSplitDepth, float randomHeightSize)
     {
-        if (gridSplitDepth > Grid.GridSplitCount)
+        if (gridSplitDepth > Grid.GridResolution)
         {
             return;
         }
         int spacing = (Grid.PointCount - 1) / ((int)Mathf.Pow(2, gridSplitDepth - 1));
         int half_spacing = spacing / 2;
 
-        for (int i = 0; i < Grid.PointCount - 1; i += half_spacing)
+        int i_count = 0;
+
+        for (int i = 0; i < Grid.PointCount; i += half_spacing)
         {
-            int initial_j = isEven(i) * half_spacing;
-            for (int j = initial_j; j < Grid.PointCount - 1; j += spacing)
+            int initial_j = isEven(i_count) * half_spacing;
+            for (int j = initial_j; j < Grid.PointCount; j += spacing)
             {
                 float height_n = Grid.GetHeight(i - half_spacing, j);
                 float height_e = Grid.GetHeight(i , j + half_spacing);
                 float height_s = Grid.GetHeight(i + half_spacing, j);
                 float height_w = Grid.GetHeight(i, j - half_spacing);
-                float height = ((height_n + height_e + height_s + height_w) / 4) + (float)(Random.NextDouble() * randomSize);
+                float height = ((height_n + height_e + height_s + height_w) / 4) + NextRandom(randomHeightSize);
                 Grid.SetHeight(i, j, height);
             }
+            i_count++;
         }
-        Diamond(gridSplitDepth + 1, randomSize * RandomDecay);
+        Diamond(gridSplitDepth + 1, randomHeightSize * RandomDecay);
     }
 
     private int isEven(int num)
@@ -224,6 +230,19 @@ public class FractalGrid {
         return -1;
     }
 
+    private float NextRandom(float randomHeightSize)
+    {
+        if (RandomSeed == 0f)
+        {
+            return 0;
+        }
+        else
+        {
+            return (float)(Random.NextDouble() * randomHeightSize) - (randomHeightSize/2);
+        }
+        
+    }
+
     public Mesh ToMesh()
     {
         return Grid.ToMesh();
@@ -232,15 +251,15 @@ public class FractalGrid {
 
 public class LandscapeGenerator : MonoBehaviour {
 
-    public int gridSplitCount = 4;
+    public int gridResolution = 4;
     public float gridSize = 10;
-    public float randomSize = 10;
+    public float randomHeightSize = 10;
     public float randomSeed = 1;
     public float randomDecay = 0.5f;
 
     void Start () {
         var meshFilter = GetComponent<MeshFilter>();
-        var fractalGrid = new FractalGrid(gridSplitCount, gridSize, randomSize, randomSeed, randomDecay);
+        var fractalGrid = new FractalGrid(gridResolution, gridSize, randomHeightSize, randomSeed, randomDecay);
         var mesh = fractalGrid.ToMesh();
         meshFilter.mesh = mesh;
     }
